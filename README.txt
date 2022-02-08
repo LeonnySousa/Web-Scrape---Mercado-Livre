@@ -2,12 +2,6 @@
 # 1 - Execute this code
 # 2 - Type a product name
 # 3 - This automatic program will search and Scrape all the products found in the site
-
-
-# Warning: This code is use to Scrap data from the site: "Mercado Livre"
-# 1 - Execute this code
-# 2 - Type a product name
-# 3 - This automatic program will search and Scrape all the products found in the site
 # 4 - The results found will be save in a excel file
 
 # Fist of all, you need to install the libraries: requests, bs4, pandas, selenium, XlsxWriter
