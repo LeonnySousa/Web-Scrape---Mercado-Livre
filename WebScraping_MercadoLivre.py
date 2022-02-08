@@ -1,52 +1,82 @@
+# Warning: This code is use to Scrap data from the site: "Mercado Livre"
+# 1 - Execute this code
+# 2 - Type a product name
+# 3 - This automatic program will search and Scrape all the products found in the site
+# 4 - The results found will be save in a excel file
+
+# Fist of all, you need to install the libraries: requests, bs4, pandas, selenium, XlsxWriter
+# You can find the installation accessing the Links below:
+
+#    - https://pypi.org/project/requests/
+#      Requests allows you to send HTTP/1.1 requests extremely easily
+
+#    - https://pypi.org/project/bs4/
+#      Beautiful Soup is a Python library for pulling data out of HTML and XML files.
+
+#    - https://pypi.org/project/selenium/
+#      Selenium is a powerful tool for controlling web browsers
+
+#    - https://pypi.org/project/pandas/
+#      Pandas is a Python package that provides fast, flexible, and expressive data structures
+#      designed to make working with "relational" or "labeled" data
+
+#    - https://pypi.org/project/XlsxWriter/
+#      Python module for writing files in the Excel
+
+
+# Import of packages:
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-
 import time
-
-# para rodar o chrome em 2º plano
-# from selenium.webdriver.chrome.options import Options
-# chrome_options = Options()
-# chrome_options.headless = True
-# navegador = webdriver.Chrome(options=chrome_options)
-
-
-URL_principal = 'https://lista.mercadolivre.com.br/'
-search_product = input('Type the product you want to search for:')
-
-# abrir um navegador
-ser = Service("C:/Users/Leonny Sousa/PycharmProjects/Web_Scraping_Mercado_Livre/chromedriver.exe")
-op = webdriver.ChromeOptions()
-Web = webdriver.Chrome(service=ser, options=op)
 
 
 def open_link(url_link):
+    """ This function receives a Url Link and open on the Chrome """
     Web.get(url_link)
-    time.sleep(3)
+    time.sleep(2)
 
 
 def scrap_response_and_html(url_link):
+    """
+    This Function is used to get the response HTTP and HTML from an URL LINK
+    response = HTTP response
+    Site = HTML code
+    """
     response = requests.get(url_link)
     time.sleep(1)
     site = BeautifulSoup(response.text, 'html.parser')
-    time.sleep(3)
+    time.sleep(1)
     return response, site
 
 
-def next_page_html():
+def next_page_html(site):
+    """ This function is used to find the Next page URL Link """
     nxt = site.find('li', attrs={'class': 'andes-pagination__button andes-pagination__button--next'})
     next_page = nxt.find('a', attrs={'class': 'andes-pagination__link ui-search-link'})['href']
     return next_page
 
 
-def scrap_products(products):
+def current_and_last_page(site):
+    """ This function is use to get the current and the last page from the results found """
+    last_page = site.find('li', attrs={'class': "andes-pagination__page-count"})
+    current_page = site.find('li', attrs={'class': "andes-pagination__button andes-pagination__button--current"})
+    return int(current_page.text), int(last_page.text[2:])
+
+def scrap_products(site):
+    """
+    This function receives the HTML and search for Tags with product information:
+    name  =  product name
+    Price = Product value
+    link = Link where the product can be found
+    """
     list_of_products = []
+    products = site.findAll('div', attrs={
+        'class': 'andes-card andes-card--flat andes-card--default ui-search-result '
+                 'ui-search-result--core andes-card--padding-default'})
+
     for product in products:
         nome = product.find('h2', attrs={'class': "ui-search-item__title"})
         link = product.find('a', attrs={'class': 'ui-search-item__group__element ui-search-link'})
@@ -55,7 +85,7 @@ def scrap_products(products):
         cents = product.find('span', attrs={'class': 'price-tag-cents'})
 
         if real and cents:
-            price = real.text + ',' + cents.text
+            price = real.text + '.' + cents.text
         else:
             price = real.text
 
@@ -64,30 +94,42 @@ def scrap_products(products):
     return list_of_products
 
 
-page = URL_principal + search_product
-count = 1
-List = []
-writer = pd.ExcelWriter('Produtos.xlsx', engine='xlsxwriter')
-s
-while page:
+# Link to search a product:
+URL_main = 'https://lista.mercadolivre.com.br/'
+search_product = input('Type the product you want to search for:')
+page = URL_main + search_product
+
+# Opening the Chrome:
+ser = Service("C:/Users/Leonny Sousa/PycharmProjects/Web_Scraping_Mercado_Livre/chromedriver.exe")
+op = webdriver.ChromeOptions()
+Web = webdriver.Chrome(service=ser, options=op)
+
+# Initializating variables
+List = []  # list of products on a page
+current_page = 0 # Current searching page
+last_page = 0 # Last found page
+
+# Opening Excel Writer:
+writer = pd.ExcelWriter('Products.xlsx', engine='xlsxwriter')
+
+
+while current_page <= last_page:
     open_link(page)
     response, site = scrap_response_and_html(page)
-    products = site.findAll('div', attrs={
-        'class': 'andes-card andes-card--flat andes-card--default ui-search-result ui-search-result--core andes-card--padding-default'})
-
-    list_of_products = scrap_products(products)
+    list_of_products = scrap_products(site)
     List = pd.DataFrame(list_of_products, columns=['Title', 'Price', 'Link'])
-    List.to_excel(writer, sheet_name='Sheet ' + str(count), index=False)
+    current_page, last_page = current_and_last_page(site)
 
-    try:
-        page = next_page_html()
-    except:
-        print('Não há proxima pagina!!')
-        break
-
-    # path = r"C:\Users\Leonny Sousa\PycharmProjects\Produtos.xlsx"
+    List.to_excel(writer, sheet_name='Sheet ' + str(current_page), index=False)
 
     print(List)
-    count = count + 1
+    print(f"{current_page} of {last_page} pages")
 
+    try:
+        page = next_page_html(site)
+    except:
+        print('Next page not found!!')
+        break
+
+# Saving Excel File:
 writer.save()
