@@ -2,7 +2,7 @@
 # 1 - Execute this code
 # 2 - Type a product name
 # 3 - This automatic program will search and Scrape all the products found in the site
-# 4 - The results found will be save in a excel file
+# 4 - The results found will be save in a Excel file
 
 # Fist of all, you need to install the libraries: requests, bs4, pandas, selenium, XlsxWriter
 # You can find the installation accessing the Links below:
@@ -39,7 +39,7 @@ def open_link(url_link):
     time.sleep(2)
 
 
-def scrap_response_and_html(url_link):
+def scrape_response_and_html(url_link):
     """
     This Function is used to get the response HTTP and HTML from an URL LINK
     response = HTTP response
@@ -61,11 +61,19 @@ def next_page_html(site):
 
 def current_and_last_page(site):
     """ This function is use to get the current and the last page from the results found """
-    last_page = site.find('li', attrs={'class': "andes-pagination__page-count"})
-    current_page = site.find('li', attrs={'class': "andes-pagination__button andes-pagination__button--current"})
-    return int(current_page.text), int(last_page.text[2:])
+    try:
+        last_page = site.find('li', attrs={'class': "andes-pagination__page-count"})
+        current_page = site.find('li', attrs={'class': "andes-pagination__button andes-pagination__button--current"})
+        last_page = int(last_page.text[2:])
+        current_page = int(current_page.text)
+    except (AttributeError, TypeError):
+        print("Only 1 Page found!!")
+        current_page = 1
+        last_page = 1
+    return current_page, last_page
 
-def scrap_products(site):
+
+def scrape_products(site):
     """
     This function receives the HTML and search for Tags with product information:
     name  =  product name
@@ -110,26 +118,24 @@ current_page = 0 # Current searching page
 last_page = 0 # Last found page
 
 # Opening Excel Writer:
-writer = pd.ExcelWriter('Products.xlsx', engine='xlsxwriter')
+with pd.ExcelWriter('Products.xlsx', engine='xlsxwriter') as writer:
+    while current_page <= last_page:
+        open_link(page)
+        response, site = scrape_response_and_html(page)
+        list_of_products = scrape_products(site)
+        List = pd.DataFrame(list_of_products, columns=['Title', 'Price', 'Link'])
+        current_page, last_page = current_and_last_page(site)
 
 
-while current_page <= last_page:
-    open_link(page)
-    response, site = scrap_response_and_html(page)
-    list_of_products = scrap_products(site)
-    List = pd.DataFrame(list_of_products, columns=['Title', 'Price', 'Link'])
-    current_page, last_page = current_and_last_page(site)
+        List.to_excel(writer, sheet_name='Sheet ' + str(current_page), index=False)
 
-    List.to_excel(writer, sheet_name='Sheet ' + str(current_page), index=False)
+        print(List)
+        print(f"{current_page} of {last_page} pages")
 
-    print(List)
-    print(f"{current_page} of {last_page} pages")
+        if current_page < last_page:
+            page = next_page_html(site)
+        else:
+            break
 
-    try:
-        page = next_page_html(site)
-    except:
-        print('Next page not found!!')
-        break
 
-# Saving Excel File:
-writer.save()
+    
